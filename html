@@ -1,0 +1,101 @@
+<!-- File: gpt-web-teaching-bot.html -->
+
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>國中監督式機器學習引導式教學 GPT 聊天機器人</title>
+</head>
+<body style="font-family: sans-serif; margin: 20px;">
+
+<h2 style="text-align:center;">國中監督式機器學習教學 GPT 聊天機器人</h2>
+<div style="max-width:700px;margin:auto;">
+  <div id="chatHistory" style="border:1px solid #ccc; padding:10px; height:500px; overflow-y:auto; background:#f9f9f9;"></div>
+  <textarea id="userInput" rows="3" style="width:100%;margin-top:10px;padding:10px;"></textarea>
+  <div style="text-align:center;margin-top:10px;">
+    <button onclick="sendQuestion()" style="padding:10px 20px;">送出問題</button>
+    <button onclick="clearChatHistory()" style="padding:10px 20px;margin-left:10px;">清除紀錄</button>
+  </div>
+</div>
+
+<script>
+const apiUrl = 'https://ai.fakeopen.com/v1/chat/completions';
+
+const systemPrompt = `你是一位以「引導式教學法」為核心教學策略的國中教師，專長於教授監督式機器學習的基礎概念。
+你僅具備國中程度的數學知識，擅長使用生活化比喻和互動式問題設計，協助學生自主推理與建構知識。
+教學單元範圍：感知器、多元決策樹、線性回歸、K近鄰演算法、貝氏分類器。
+遵循GROW模型進行教學，不直接給答案，使用反問、生活比喻、鼓勵參與，從例子中歸納概念，文字說明需使用繁體中文。每次互動只執行GROW一個步驟，不要一次說完。`;
+
+function loadChatHistory() {
+  const history = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+  const chatHistoryDiv = document.getElementById('chatHistory');
+  chatHistoryDiv.innerHTML = history.map(entry => `<div><strong>你:</strong> ${entry.q}</div><div><strong>GPT:</strong> ${entry.a}</div><hr>`).join('');
+  chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+}
+
+function clearChatHistory() {
+  localStorage.removeItem('chatHistory');
+  document.getElementById('chatHistory').innerHTML = '';
+}
+
+async function sendQuestion() {
+  const userInput = document.getElementById('userInput').value.trim();
+  const chatHistoryDiv = document.getElementById('chatHistory');
+
+  if (!userInput) {
+    alert('請輸入問題');
+    return;
+  }
+
+  chatHistoryDiv.innerHTML += `<div><strong>你:</strong> ${userInput}</div><div><em>思考中...</em></div><hr>`;
+  document.getElementById('userInput').value = '';
+  chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userInput }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`伺服器錯誤: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+
+    let answer = '';
+    if (data.choices && data.choices.length > 0) {
+      answer = data.choices[0].message.content;
+    } else {
+      answer = '無法取得回答，請稍後再試';
+    }
+
+    const newEntry = { q: userInput, a: answer };
+    const history = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+    history.push(newEntry);
+    localStorage.setItem('chatHistory', JSON.stringify(history));
+
+    loadChatHistory();
+
+  } catch (error) {
+    console.error(error);
+    alert('發生錯誤: ' + error.message);
+  }
+}
+
+loadChatHistory();
+</script>
+
+</body>
+</html>s
